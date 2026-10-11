@@ -15,14 +15,16 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Build only yuedu app target directly
+      - name: Build only main app
         run: |
-          xcodebuild -project Yuedu-Reader.xcodeproj -target "yuedu app" -configuration Release -derivedDataPath build build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=""
+          xcodebuild -scheme Yuedu-Reader -target "yuedu app" -configuration Release build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=""
 
-      - name: Package IPA manually
+      - name: Find .app and package IPA
         run: |
+          APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "yuedu_app*.app" | grep Release-iphoneos | head -1)
+          echo "Found app: $APP_PATH"
           mkdir -p Payload
-          cp -r build/Build/Products/Release-iphoneos/*.app Payload/
+          cp -r "$APP_PATH" Payload/
           zip -r Yuedu-Reader.ipa Payload
 
       - name: Upload artifact
