@@ -17,7 +17,7 @@ jobs:
 
       - name: Build
         run: |
-          xcodebuild -scheme Yuedu-Reader -configuration Release -derivedDataPath build archive
+          xcodebuild -scheme Yuedu-Reader -configuration Release -derivedDataPath build archive CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=""e
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
