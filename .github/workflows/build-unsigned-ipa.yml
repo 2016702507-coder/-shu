@@ -15,9 +15,9 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Build only main app target
+      - name: Build only yuedu app target directly
         run: |
-          xcodebuild -scheme Yuedu-Reader -target "yuedu app" -configuration Release -derivedDataPath build build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=""
+          xcodebuild -project Yuedu-Reader.xcodeproj -target "yuedu app" -configuration Release -derivedDataPath build build CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY=""
 
       - name: Package IPA manually
         run: |
