@@ -1,23 +1,68 @@
 name: Build Unsigned IPA
 
 on:
-  workflow_dispatch:   # 允许在 GitHub 页面上手动点击按钮触发构建
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest   # 使用 GitHub 免费提供的 macOS 运行器
+    runs-on: macos-latest
     timeout-minutes: 60
+
+    env:
+      # ===== 只需要改这里 =====
+      SCHEME: Yuedu
+      CONFIGURATION: Release
+      # =======================
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build and Archive (Unsigned)
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install CocoaPods dependencies if needed
         run: |
+          set -euo pipefail
+          if [ -f Podfile ]; then
+            echo "Podfile found, installing CocoaPods dependencies..."
+            if ! command -v pod >/dev/null 2>&1; then
+              sudo gem install cocoapods
+            fi
+            pod install
+          else
+            echo "No Podfile found, skip pod install."
+          fi
+
+      - name: Build and Archive Unsigned
+        run: |
+          set -euo pipefail
+
+          WORKSPACE=$(find . -maxdepth 3 -name '*.xcworkspace' \
+            -not -path '*/Pods/*' \
+            -not -path '*/.git/*' \
+            | head -n 1 || true)
+
+          PROJECT=$(find . -maxdepth 3 -name '*.xcodeproj' \
+            -not -path '*/Pods/*' \
+            -not -path '*/.git/*' \
+            | head -n 1 || true)
+
+          if [ -n "$WORKSPACE" ]; then
+            echo "Using workspace: $WORKSPACE"
+            BUILD_TARGET=(-workspace "$WORKSPACE")
+          elif [ -n "$PROJECT" ]; then
+            echo "Using project: $PROJECT"
+            BUILD_TARGET=(-project "$PROJECT")
+          else
+            echo "ERROR: No .xcworkspace or .xcodeproj found."
+            exit 1
+          fi
+
           xcodebuild clean archive \
-            -project YourProject.xcodeproj \
-            -scheme YourScheme \
-            -configuration Release \
+            "${BUILD_TARGET[@]}" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
             -destination 'generic/platform=iOS' \
             -archivePath build/App.xcarchive \
             CODE_SIGN_IDENTITY="" \
@@ -26,12 +71,36 @@ jobs:
 
       - name: Export Unsigned IPA
         run: |
+          set -euo pipefail
+
+          APP_PATH=$(find build/App.xcarchive/Products/Applications \
+            -maxdepth 1 \
+            -name '*.app' \
+            -print -quit)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: No .app found in archive."
+            exit 1
+          fi
+
+          APP_NAME=$(basename "$APP_PATH")
+          IPA_NAME="unsigned-${APP_NAME%.app}.ipa"
+
+          echo "Found app: $APP_NAME"
+          echo "IPA name: $IPA_NAME"
+
+          rm -rf Payload
           mkdir -p Payload
-          cp -R build/App.xcarchive/Products/Applications/YourApp.app Payload/
-          ditto -c -k --sequesterRsrc --keepParent Payload YourApp-unsigned.ipa
+          cp -R "$APP_PATH" Payload/
+
+          ditto -c -k --sequesterRsrc --keepParent Payload "$IPA_NAME"
+
+          echo "Generated IPA:"
+          ls -lh "$IPA_NAME"
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-ipa
-          path: YourApp-unsigned.ipa
+          path: "*.ipa"
+          if-no-files-found: error
